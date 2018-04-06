@@ -1,0 +1,9 @@
+tensorflow
+gym
+scipy
+matplotlib
+theano
+keras
+ipython
+jupyter
+git+https://github.com/jakevdp/JSAnimation.git
