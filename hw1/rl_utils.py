@@ -39,13 +39,14 @@ class SupervisedPolicy:
     def load(self, filename):
         self.model.load_weights(filename)
 
-def run_rollouts(env, policy, num_steps, num_rollouts):
+def run_rollouts(env, policy, max_steps, num_rollouts):
     actions = []
     observations = []
     rewards = []
 
     
     for i in range(num_rollouts):
+        # env, _ = load_expert_policy('roboschool-cheetah')
         obs = env.reset()
         # if i==1: print(obs)
         done = False
@@ -63,8 +64,8 @@ def run_rollouts(env, policy, num_steps, num_rollouts):
             reward += r
             steps += 1
             
-            if steps % 100 == 0: print("%i/%i"%(steps, max_steps))
-            if steps >= num_steps:
+            if steps % 500 == 0: print("%i/%i"%(steps, max_steps))
+            if steps >= max_steps:
                 break
         rewards.append(reward)
 
