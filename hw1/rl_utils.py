@@ -1,8 +1,10 @@
-import h5py
 import importlib
+import json
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
+from keras.models import model_from_json
+import os
 
 def load_expert_policy(name):
     policy_module = importlib.import_module('experts.' + name)
@@ -40,8 +42,31 @@ class SupervisedPolicy:
     def save(self, filename):
         self.model.save_weights(filename)
 
+    def save_json(self):
+        model_json = self.model.to_json(indent=4)
+        # Save the graph
+        with open('./data/model.json', 'w') as json_file:
+            json_file.write(model_json)
+        self.model.save_weights('./data/model.h5')
+        print('saved to /data')
+
     def load(self, filename):
         self.model.load_weights(filename)
+
+    def load_json(self, model_file='data/model.json', weights_file='data/model.h5'):
+        # check if both of them actually exist
+        assert os.path.isfile(model_file)
+        assert os.path.isfile(weights_file)
+        
+        json_file = open(model_file, 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        self.model = model_from_json(loaded_model_json)
+        self.model.load_weights(weights_file)
+
+        # Compile it again
+        self.model.compile(loss='mse', optimizer='sgd')
+
 
 def run_rollouts(env, policy, max_steps, num_rollouts):
     actions = []
