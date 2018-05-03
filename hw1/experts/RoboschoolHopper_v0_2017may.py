@@ -4,7 +4,7 @@ import numpy as np
 def relu(x):
     return np.maximum(x, 0)
 
-class SmallReactivePolicy:
+ class SmallReactivePolicy:
     "Simple multi-layer perceptron policy, no internal state"
     def __init__(self, observation_space, action_space):
         assert weights_dense1_w.shape == (observation_space.shape[0], 128)
@@ -17,6 +17,12 @@ class SmallReactivePolicy:
         x = relu(np.dot(x, weights_dense2_w) + weights_dense2_b)
         x = np.dot(x, weights_final_w) + weights_final_b
         return x
+
+def get_env_and_policy():
+    env_name = "RoboschoolHopper-v1"
+    env = gym.make(env_name)
+    pi = SmallReactivePolicy(env.observation_space, env.action_space)
+    return env, pi, env_name
 
 def demo_run():
     env = gym.make("RoboschoolHopper-v1")

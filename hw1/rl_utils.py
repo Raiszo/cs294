@@ -1,3 +1,5 @@
+import gym
+
 import importlib
 import json
 import numpy as np
@@ -130,6 +132,20 @@ def render_demo(env, policy, steps):
 
     obs = env.reset()
     
+    for i in range(steps):
+        a = policy.act(obs)
+        obs, r, done, _ = env.step(a)
+        frames.append(env.render(mode='rgb_array'))
+        if done: break
+
+    return frames
+
+def render_NOerrors(env_name, policy, steps):
+    frames = []
+    env = gym.make(env_name)
+
+    obs = env.reset()
+
     for i in range(steps):
         a = policy.act(obs)
         obs, r, done, _ = env.step(a)

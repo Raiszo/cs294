@@ -18,6 +18,13 @@ class SmallReactivePolicy:
         x = np.dot(x, weights_final_w) + weights_final_b
         return x
 
+def get_env_and_policy():
+    env_name = "RoboschoolHumanoidFlagrunHarder-v1"
+    env = gym.make(env_name)
+    pi = SmallReactivePolicy(env.observation_space, env.action_space)
+    return env, pi, env_name
+
+    
 def demo_run():
     env = gym.make("RoboschoolHumanoidFlagrunHarder-v1")
     if len(sys.argv)==3: env.unwrapped.multiplayer(env, sys.argv[1], player_n=int(sys.argv[2]))

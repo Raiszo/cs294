@@ -19,6 +19,12 @@ class SmallReactivePolicy:
         x = np.dot(x, weights_final_w) + weights_final_b
         return x
 
+def get_env_and_policy():
+    env_name = "RoboschoolHumanoid-v1"
+    env = gym.make(env_name)
+    pi = SmallReactivePolicy(env.observation_space, env.action_space)
+    return env, pi, env_name
+    
 def demo_run():
     env = gym.make("RoboschoolHumanoid-v1")
     pi = SmallReactivePolicy(env.observation_space, env.action_space)
