@@ -1,8 +1,11 @@
 import gym
 
+from collections import deque
 import importlib
 import json
 import numpy as np
+import random
+
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.models import model_from_json
@@ -69,6 +72,52 @@ class SupervisedPolicy:
         # Compile it again
         self.model.compile(loss='mse', optimizer='sgd')
 
+class Dagger:
+    def __init__(self, env, expert, noob, buffer_size):
+        self.env = env
+        self.teacher = expert
+        self.student = noob
+        
+        self.buffer_size = buffer_size
+        self.count = 0
+        self.buffer = deque()
+        # Beta: fraction assist
+        self.beta = 1
+
+    def addExp(self, s, a):
+        experience = (s,a)
+        if self.count < self.buffer_size:
+            self.buffer.append(experience)
+            self.count += 1
+        else:
+            self.buffer.popleft()
+            self.buffer.append(experience)
+
+    def act(self, obs):
+        teacher_action = self.teacher.act(obs)
+        student_action = self.student.act(obs)
+
+        self.addExp(obs, teacher_action)
+
+        return teacher_action if random.random() < self.beta else student_action
+    
+    def train(self, max_steps, verbose, iterations=200):
+        val_data = get_valdata(self.env, self.teacher, self.env.spec.timestep_limit)
+        for i in range(iterations):
+            print('DAgger iter', i)
+            if i == 0:
+                rollouts = 50
+                epochs = 100
+            else:
+                rollouts = 1
+                epochs = 4
+                self.beta -= 0.01
+
+            # Let the assisted Policy act (self)
+            obs, act, _ = run_rollouts(self.env, self, max_steps, rollouts)
+            train_data = (obs, act)
+            self.student.train(train_data, val_data, epochs, verbose=verbose)
+
 
 def run_rollouts(env, policy, max_steps, num_rollouts):
     actions = []
@@ -100,32 +149,10 @@ def run_rollouts(env, policy, max_steps, num_rollouts):
 
     return (np.array(observations), np.array(actions), np.array(rewards))
 
+
 def get_valdata(env, policy, max_steps):
-    actions = []
-    observations = []
-
-    for i in range(2):
-        obs = env.reset()
-        done = False
-        reward = 0
-        steps = 0
-
-        while not done:
-            act = policy.act(obs)
-
-            actions.append(act)
-            observations.append(obs)
-
-            obs, r, done, _ = env.step(act)
-
-            reward += r
-            steps += 1
-            
-            # if steps % 500 == 0: print("%i/%i"%(steps, max_steps))
-            if steps >= max_steps:
-                break
-
-    return (np.array(observations)[:10], np.array(actions)[:10])
+    obs, act, _ = run_rollouts(env, policy, max_steps, 4)
+    return (obs[::10], act[::10])
 
 def render_demo(env, policy, steps):
     frames = []

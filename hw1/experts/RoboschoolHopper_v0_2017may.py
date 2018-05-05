@@ -4,7 +4,7 @@ import numpy as np
 def relu(x):
     return np.maximum(x, 0)
 
- class SmallReactivePolicy:
+class SmallReactivePolicy:
     "Simple multi-layer perceptron policy, no internal state"
     def __init__(self, observation_space, action_space):
         assert weights_dense1_w.shape == (observation_space.shape[0], 128)
@@ -271,6 +271,3 @@ weights_final_w = np.array([
 ])
 
 weights_final_b = np.array([ +0.4868, -0.0987, -0.0946])
-
-if __name__=="__main__":
-    demo_run()
