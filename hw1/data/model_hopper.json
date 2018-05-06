@@ -1,0 +1,68 @@
+{
+    "class_name": "Sequential",
+    "keras_version": "2.1.5",
+    "config": [
+        {
+            "class_name": "Dense",
+            "config": {
+                "kernel_initializer": {
+                    "class_name": "VarianceScaling",
+                    "config": {
+                        "mode": "fan_avg",
+                        "seed": null,
+                        "distribution": "uniform",
+                        "scale": 1.0
+                    }
+                },
+                "activation": "relu",
+                "bias_initializer": {
+                    "class_name": "Zeros",
+                    "config": {}
+                },
+                "dtype": "float32",
+                "bias_regularizer": null,
+                "kernel_regularizer": null,
+                "units": 128,
+                "name": "dense_7",
+                "use_bias": true,
+                "bias_constraint": null,
+                "kernel_constraint": null,
+                "batch_input_shape": [
+                    null,
+                    15
+                ],
+                "activity_regularizer": null,
+                "trainable": true
+            }
+        },
+        {
+            "class_name": "Dense",
+            "config": {
+                "kernel_initializer": {
+                    "class_name": "VarianceScaling",
+                    "config": {
+                        "mode": "fan_avg",
+                        "seed": null,
+                        "distribution": "uniform",
+                        "scale": 1.0
+                    }
+                },
+                "activation": "linear",
+                "bias_initializer": {
+                    "class_name": "Zeros",
+                    "config": {}
+                },
+                "bias_regularizer": null,
+                "kernel_regularizer": null,
+                "units": 3,
+                "name": "dense_8",
+                "use_bias": true,
+                "bias_constraint": null,
+                "kernel_constraint": null,
+                "trainable": true,
+                "activity_regularizer": null
+            }
+        }
+    ],
+    "backend": "tensorflow"
+}

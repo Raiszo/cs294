@@ -24,7 +24,7 @@ class SupervisedPolicy:
         output_len = action_space.shape[0]
         
         self.model = Sequential()
-        self.model.add(Dense(units=64, input_dim=input_len, activation='relu'))
+        self.model.add(Dense(units=128, input_dim=input_len, activation='relu'))
         self.model.add(Dense(units=output_len))
 
 
