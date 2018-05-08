@@ -35,7 +35,13 @@ def build_mlp(
 
     with tf.variable_scope(scope):
         # YOUR_CODE_HERE
-        pass
+        y = input_placeholder
+        
+        for i in range(n_layers):
+            y = tf.layers.dense(y, size, activation=activation, use_bias=True)
+
+        y = tf.layers.dense(y,output_size, use_bias=True)
+        return y
 
 def pathlength(path):
     return len(path["reward"])
@@ -123,7 +129,7 @@ def train_PG(exp_name='',
         sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
 
     # Define a placeholder for advantages
-    sy_adv_n = TODO
+    sy_adv_n = tf.placeholder(shape=[None], name='adv', dtype=tf.float32)
 
 
     #========================================================================================#
