@@ -173,9 +173,9 @@ def train_PG(exp_name='',
 
     if discrete:
         # YOUR_CODE_HERE
-        sy_logits_na = TODO
-        sy_sampled_ac = TODO # Hint: Use the tf.multinomial op
-        sy_logprob_n = TODO
+        sy_logits_na = build_mlp(sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
+        sy_sampled_ac = tf.multinomial(sy_logits_na, 1)
+        sy_logprob_n = tf.nn.softmax_cross_entropy_with_logits_v2(labels=sy_ac_na, logits=sy_sampled_ac)
 
     else:
         # YOUR_CODE_HERE
@@ -191,7 +191,7 @@ def train_PG(exp_name='',
     # Loss Function and Training Operation
     #========================================================================================#
 
-    loss = TODO # Loss function that we'll differentiate to get the policy gradient.
+    loss = tf.reduce_mean(sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
     update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
 
@@ -210,7 +210,10 @@ def train_PG(exp_name='',
         # Define placeholders for targets, a loss function and an update op for fitting a 
         # neural network baseline. These will be used to fit the neural network baseline. 
         # YOUR_CODE_HERE
-        baseline_update_op = TODO
+        # This is some actor-critic stuff, not prepared for this
+        sy_b_n = tf.placeholder(shape=[None], name='b', dtype=tf.float32)
+        b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=sy_b_n, predictions=baseline_prediction))
+        _update_op = tf.train.AdamOptimizer(learning_rate).minimize(b_loss)
 
 
     #========================================================================================#
@@ -323,7 +326,12 @@ def train_PG(exp_name='',
         #====================================================================================#
 
         # YOUR_CODE_HERE
-        q_n = TODO
+        if reward_to_go == False:
+            q_n = np.concatenate([ np.sum(path['reward'])*np.ones_like(path['actions']) for path in paths ])
+        else:
+            # the same as np.flip(np.cumsum(np.flip(b, axis=0)), axis=0)
+            # the [::-1] means use a stride of -1(backwards), one can use it instead of flip
+            q_n = np.concatenate([ np.cumsum(path['reward'][::-1])[::-1] for path in paths ])
 
         #====================================================================================#
         #                           ----------SECTION 5----------
@@ -339,7 +347,7 @@ def train_PG(exp_name='',
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
 
-            b_n = TODO
+            b_n = baseline_prediction
             adv_n = q_n - b_n
         else:
             adv_n = q_n.copy()
