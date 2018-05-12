@@ -347,7 +347,7 @@ def train_PG(exp_name='',
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
 
-            b_n = baseline_prediction
+            b_n = sess.run(baseline_prediction, feed_dict={sy_ob_no: ob_no})
             adv_n = q_n - b_n
         else:
             adv_n = q_n.copy()
