@@ -32,9 +32,11 @@ class PolicyGradient:
     def __init__(self,
                  env_name='CartPole-v0',
                  n_iter=100, 
-                 gamma=1.0, 
+                 gamma=1.0,
+                 learning_rate=5e-3,
                  max_path_length=None,
                  reward_to_go=True,
+                 nn_baseline=False,
                  seed=0,
                  n_layers=1,
                  size=32
@@ -55,6 +57,7 @@ class PolicyGradient:
 
         # Observation and action sizes
         ob_dim = self.env.observation_space.shape[0]
+        print(self.env.action_space.n)
         ac_dim = self.env.action_space.n if discrete else self.env.action_space.shape[0]
 
         """
@@ -68,8 +71,10 @@ class PolicyGradient:
 
         if discrete:
             sy_logits_na = build_mlp(self.sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
-            sy_sampled_ac = tf.multinomial(sy_logits_na, 1)
-            self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.one_hot(self.sy_ac_na, ac_dim), logits=sy_sampled_ac)
+            # print(sy_logits_na.shape)
+            # sy_sampled_ac = tf.multinomial(sy_logits_na, 1)
+            # print(sy_sampled_ac.shape)
+            self.sy_logprob_n = tf.losses.softmax_cross_entropy(tf.one_hot(self.sy_ac_na, ac_dim), logits=sy_logits_na)
 
         self.loss = tf.reduce_mean(self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
         self.update_op = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
