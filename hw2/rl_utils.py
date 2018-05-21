@@ -52,7 +52,11 @@ class PolicyGradient:
         self.reward_to_go = reward_to_go
         self.logger = logz
         self.logger.configure_output_dir(logdir)
-
+        # Set random seeds
+        self.seed = seed
+        tf.set_random_seed(seed)
+        np.random.seed(seed)
+        
         # Log experimental parameters
         args = inspect.getargspec(self.__init__)[0]
         locals_ = locals()
@@ -62,12 +66,6 @@ class PolicyGradient:
         self.logger.save_params(params)
 
         
-        self.reward_to_go = reward_to_go
-        # Set random seeds
-        self.seed = seed
-        self.reward_to_go = reward_to_go
-        # tf.set_random_seed(seed)
-        # np.random.seed(seed)
         # Make the gym environment
         self.env = gym.make(env_name)
         # Is this env continuous, or discrete?
@@ -84,6 +82,7 @@ class PolicyGradient:
         Placeholders observations, actions and advantages
         """
         self.sy_ob_no = tf.placeholder(shape=[None, ob_dim], name="observations", dtype=tf.float32)
+        # If this is discrete, actions are just one number: 0,1,2 ... ac_dim-1
         self.sy_ac_na = tf.placeholder(shape=[None], name="actions", dtype=tf.int32) \
                         if discrete else \
                            tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32)
@@ -91,11 +90,12 @@ class PolicyGradient:
 
         if discrete:
             sy_logits_na = build_mlp(self.sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
-            # print(sy_logits_na.shape)
-            # using multinomial sampling
-            self.sy_sampled_ac = tf.one_hot(tf.multinomial(sy_logits_na, 1), ac_dim)
-            # print(sy_sampled_ac.shape)
-            self.sy_logprob_n = tf.losses.softmax_cross_entropy(tf.one_hot(self.sy_ac_na, ac_dim), logits=sy_logits_na)
+            # using multinomial sampling, because this is a stochastic policy
+            # This is the sampled action from the policy
+            self.sy_sampled_ac = tf.multinomial(tf.reduce_max(sy_logits_na, keep_dims=True), 1)
+            self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.sy_ac_na, logits=sy_logits_na)
+            
+        # TODO the non discrete case :P
 
         if nn_baseline:
             baseline_prediction = tf.squeeze(build_mlp(
@@ -122,7 +122,7 @@ class PolicyGradient:
 
 
 
-        loss = pg_loss if not nn_baseline else pg_loss + b_loss
+        loss = pg_loss + b_loss
         optimizer = tf.train.AdamOptimizer(learning_rate)
         grads = tf.gradients(loss, tf.trainable_variables())
         grads_and_vars = list(zip(grads, tf.trainable_variables()))
@@ -130,22 +130,32 @@ class PolicyGradient:
 
     def act(self, sess, obs, learning_rate=5e-3):
         action = sess.run(self.sy_sampled_ac, feed_dict={self.sy_ob_no: obs[None]})
-        return action[0]
+        return action[0][0]
     
+    def update_policy(self, sess, bundle):
+        ob_no, ac_na, re_n = bundle
+        feed_dict = {
+            self.sy_ob_no: ob_no,
+            self.sy_ac_na: ac_na,
+            self.sy_re_n: re_n
+        }
+        sess.run(self.train_op, feed_dict=feed_dict)
+
     def train(self, min_steps_per_batch=1000):
         tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)
         start = time.time()
         
         with tf.Session(config=tf_config) as sess:
+            sess.run(tf.global_variables_initializer()) #pylint: disable=E1101
+            total_timesteps = 0
             for itr in range(self.n_iter):
                 print("********** Iteration %i ************"%itr)
 
-                ob_no, ac_na, re_n = run_rollouts(self.env, sess, self, min_steps_per_batch, self.max_path_length, self.reward_to_go, self.gamma)
+                ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, min_steps_per_batch, self.max_path_length, self.reward_to_go, self.gamma)
                 bundle = (ob_no, ac_na, re_n)
+                total_timesteps += timesteps
                 
                 self.update_policy(sess, bundle)
-                returns = [path["reward"].sum() for path in paths]
-                ep_lengths = [pathlength(path) for path in paths]
                 self.logger.log_tabular("Time", time.time() - start)
                 self.logger.log_tabular("Iteration", itr)
                 self.logger.log_tabular("AverageReturn", np.mean(returns))
@@ -154,19 +164,11 @@ class PolicyGradient:
                 self.logger.log_tabular("MinReturn", np.min(returns))
                 self.logger.log_tabular("EpLenMean", np.mean(ep_lengths))
                 self.logger.log_tabular("EpLenStd", np.std(ep_lengths))
-                self.logger.log_tabular("TimestepsThisBatch", timesteps_this_batch)
+                self.logger.log_tabular("TimestepsThisBatch", timesteps)
                 self.logger.log_tabular("TimestepsSoFar", total_timesteps)
                 self.logger.dump_tabular()
                 self.logger.pickle_tf_vars()
 
-    def upadte_policy(self, sess, bundle):
-        ob_no, ac_na, re_n = bundle
-        feed_dict = {
-            self.sy_ob_no: ob_no,
-            self.sy_ac_na: ac_na,
-            self.sy_re_n: re_n
-        }
-        sess.run(self.train_op, feed_dict=feed_dict)
         
 def run_rollouts(env,
                  sess,
@@ -186,15 +188,15 @@ def run_rollouts(env,
         # animate stuff
         done = False
 
-        while not done or actions.length < max_path_length:
+        while not done or len(actions) < max_path_length:
             observations.append(obs)
-            act = policy.act(sess, obs)[0]
+            act = policy.act(sess, obs)
             actions.append(act)
 
             obs, rew, done, _ = env.step(act)
             rewards.append(rew)
 
-            if done or actions.length >= max_path_length : break
+            if done or len(actions) >= max_path_length : break
 
         path = {
             "observation": np.array(observations),
@@ -203,7 +205,7 @@ def run_rollouts(env,
         }
         paths.append(path)
 
-        steps_total += path.length
+        steps_total += len(path)
         num_rollouts += 1
 
     print(num_rollouts)
@@ -213,8 +215,11 @@ def run_rollouts(env,
         re_n = np.concatenate([ discounted(path['reward'], gamma)[0]*np.ones_like(path['actions']) for path in paths ])
     else:
         re_n = np.concatenate([ discounted(path['reward'], gamma) for path in paths ])
+    sum_re_n = np.array([path['reward'].sum() for path in paths])
+    ep_lengths = np.array([len(path['reward']) for path in paths])
+    timesteps = steps_total
         
-    return ob_no, ac_na, re_n
+    return ob_no, ac_na, re_n, sum_re_n, ep_lengths, timesteps
 
 def discounted(re, discount):
     r = re[::-1]
@@ -230,3 +235,18 @@ def wrapper(args):
     then train :3
     """
     return 0
+
+def render_NOerrors(env_name, policy, steps):
+    frames = []
+    env = gym.make(env_name)
+    
+    with tf.Session() as sess:
+        obs = env.reset()
+
+        for i in range(steps):
+            a = policy.act(sess, obs)[0]
+            obs, r, done, _ = env.step(a)
+            frames.append(env.render(mode='rgb_array'))
+            if done: break
+
+        return frames
