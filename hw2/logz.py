@@ -83,7 +83,7 @@ def pickle_tf_vars():
         pickle.dump(_dict, f)
     
 
-def dump_tabular():
+def dump_tabular(print_console=False):
     """
     Write all of the diagnostics from the current iteration
     """
@@ -93,14 +93,14 @@ def dump_tabular():
     keystr = '%'+'%d'%max_key_len
     fmt = "| " + keystr + "s | %15s |"
     n_slashes = 22 + max_key_len
-    print("-"*n_slashes)
+    if print_console: print("-"*n_slashes)
     for key in G.log_headers:
         val = G.log_current_row.get(key, "")
         if hasattr(val, "__float__"): valstr = "%8.3g"%val
         else: valstr = val
-        print(fmt%(key, valstr))
+        if print_console: print(fmt%(key, valstr))
         vals.append(val)
-    print("-"*n_slashes)
+    if print_console: print("-"*n_slashes)
     if G.output_file is not None:
         if G.first_row:
             G.output_file.write("\t".join(G.log_headers))
