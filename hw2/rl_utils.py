@@ -14,7 +14,7 @@ def build_mlp(
         output_size,
         scope, 
         n_layers=2, 
-        size=64, 
+        size=64,
         activation=tf.tanh,
         output_activation=None
         ):
@@ -91,10 +91,12 @@ class PolicyGradient:
 
         if discrete:
             sy_logits_na = build_mlp(self.sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
+            self.sy_logits_na = sy_logits_na
             # using multinomial sampling, because this is a stochastic policy
             # This is the sampled action from the policy
-            self.sy_sampled_ac = tf.multinomial(tf.reduce_max(sy_logits_na, keep_dims=True), 1)
+            self.sy_sampled_ac = tf.multinomial(tf.reduce_max(sy_logits_na, axis=1, keepdims=True), 1)
             self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.sy_ac_na, logits=sy_logits_na)
+            
             
         # TODO the non discrete case :P
 
@@ -122,10 +124,13 @@ class PolicyGradient:
 
 
 
+        # Hardcoded
+        gradient_clip = 40
 
-        loss = pg_loss + b_loss
+        self.loss = pg_loss + b_loss
         optimizer = tf.train.AdamOptimizer(learning_rate)
-        grads = tf.gradients(loss, tf.trainable_variables())
+        grads = tf.gradients(self.loss, tf.trainable_variables())
+        grads, _ = tf.clip_by_global_norm(grads, gradient_clip)
         grads_and_vars = list(zip(grads, tf.trainable_variables()))
         self.train_op = optimizer.apply_gradients(grads_and_vars)
 
@@ -140,13 +145,17 @@ class PolicyGradient:
             self.sy_ac_na: ac_na,
             self.sy_re_n: re_n
         }
+        # ac, losses, _ = sess.run([self.sy_sampled_ac, self.loss, self.train_op], feed_dict=feed_dict)
         sess.run(self.train_op, feed_dict=feed_dict)
+        # sess.run(self.train_op, feed_dict=feed_dict)
+        # print(ac)
 
-    def train(self, steps_eg=100, min_steps_per_batch=1000):
+    def train(self, print_console=False, steps_eg=100, min_steps_per_batch=1000):
         tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)
         start = time.time()
         
         with tf.Session(config=tf_config) as sess:
+            # print(tf.trainable_variables())
             sess.run(tf.global_variables_initializer()) #pylint: disable=E1101
             total_timesteps = 0
             for itr in range(self.n_iter):
@@ -155,8 +164,8 @@ class PolicyGradient:
                 ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, min_steps_per_batch, self.max_path_length, self.reward_to_go, self.gamma)
                 bundle = (ob_no, ac_na, re_n)
                 total_timesteps += timesteps
-                
                 self.update_policy(sess, bundle)
+                
                 self.logger.log_tabular("Time", time.time() - start)
                 self.logger.log_tabular("Iteration", itr)
                 self.logger.log_tabular("AverageReturn", np.mean(returns))
@@ -167,9 +176,10 @@ class PolicyGradient:
                 self.logger.log_tabular("EpLenStd", np.std(ep_lengths))
                 self.logger.log_tabular("TimestepsThisBatch", timesteps)
                 self.logger.log_tabular("TimestepsSoFar", total_timesteps)
-                self.logger.dump_tabular()
+                self.logger.dump_tabular(print_console)
                 self.logger.pickle_tf_vars()
 
+            frames = []
             env = gym.make(self.env_name)
             obs = env.reset()
 
@@ -186,7 +196,7 @@ def run_rollouts(env,
                  policy,
                  min_steps_per_batch,
                  max_path_length,
-                 reward_to_go=False,
+                 reward_to_go,
                  gamma=1):
     # paths should be an array of size num_rollouts
     paths = []
@@ -199,7 +209,7 @@ def run_rollouts(env,
         # animate stuff
         done = False
 
-        while not done or len(actions) < max_path_length:
+        while not done and len(actions) < max_path_length:
             observations.append(obs)
             act = policy.act(sess, obs)
             actions.append(act)
@@ -207,7 +217,7 @@ def run_rollouts(env,
             obs, rew, done, _ = env.step(act)
             rewards.append(rew)
 
-            if done or len(actions) >= max_path_length : break
+            # if done or len(actions) >= max_path_length : break
 
         path = {
             "observation": np.array(observations),

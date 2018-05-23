@@ -83,7 +83,7 @@ def pickle_tf_vars():
         pickle.dump(_dict, f)
     
 
-def dump_tabular(print_console=False):
+def dump_tabular(print_console):
     """
     Write all of the diagnostics from the current iteration
     """
