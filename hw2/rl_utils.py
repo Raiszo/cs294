@@ -67,6 +67,7 @@ class PolicyGradient:
 
         
         # Make the gym environment
+        self.env_name = env_name
         self.env = gym.make(env_name)
         # Is this env continuous, or discrete?
         discrete = isinstance(self.env.action_space, gym.spaces.Discrete)
@@ -141,7 +142,7 @@ class PolicyGradient:
         }
         sess.run(self.train_op, feed_dict=feed_dict)
 
-    def train(self, min_steps_per_batch=1000):
+    def train(self, steps_eg=100, min_steps_per_batch=1000):
         tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)
         start = time.time()
         
@@ -169,6 +170,16 @@ class PolicyGradient:
                 self.logger.dump_tabular()
                 self.logger.pickle_tf_vars()
 
+            env = gym.make(self.env_name)
+            obs = env.reset()
+
+            for i in range(steps_eg):
+                a = self.act(sess, obs)
+                obs, r, done, _ = env.step(a)
+                frames.append(env.render(mode='rgb_array'))
+                if done: break
+                
+            return frames
         
 def run_rollouts(env,
                  sess,
@@ -244,7 +255,7 @@ def render_NOerrors(env_name, policy, steps):
         obs = env.reset()
 
         for i in range(steps):
-            a = policy.act(sess, obs)[0]
+            a = policy.act(sess, obs)
             obs, r, done, _ = env.step(a)
             frames.append(env.render(mode='rgb_array'))
             if done: break
