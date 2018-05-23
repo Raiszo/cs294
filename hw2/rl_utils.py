@@ -91,10 +91,9 @@ class PolicyGradient:
 
         if discrete:
             sy_logits_na = build_mlp(self.sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
-            self.sy_logits_na = sy_logits_na
             # using multinomial sampling, because this is a stochastic policy
             # This is the sampled action from the policy
-            self.sy_sampled_ac = tf.multinomial(tf.reduce_max(sy_logits_na, axis=1, keepdims=True), 1)
+            self.sy_sampled_ac = tf.multinomial(sy_logits_na - tf.reduce_max(sy_logits_na, axis=1, keepdims=True), 1)
             self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.sy_ac_na, logits=sy_logits_na)
             
             
@@ -130,9 +129,10 @@ class PolicyGradient:
         self.loss = pg_loss + b_loss
         optimizer = tf.train.AdamOptimizer(learning_rate)
         grads = tf.gradients(self.loss, tf.trainable_variables())
-        grads, _ = tf.clip_by_global_norm(grads, gradient_clip)
-        grads_and_vars = list(zip(grads, tf.trainable_variables()))
+        self.grads, _ = tf.clip_by_global_norm(grads, gradient_clip)
+        grads_and_vars = list(zip(self.grads, tf.trainable_variables()))
         self.train_op = optimizer.apply_gradients(grads_and_vars)
+        # self.train_op = optimizer.minimize(self.loss)
 
     def act(self, sess, obs, learning_rate=5e-3):
         action = sess.run(self.sy_sampled_ac, feed_dict={self.sy_ob_no: obs[None]})
@@ -145,8 +145,8 @@ class PolicyGradient:
             self.sy_ac_na: ac_na,
             self.sy_re_n: re_n
         }
-        # ac, losses, _ = sess.run([self.sy_sampled_ac, self.loss, self.train_op], feed_dict=feed_dict)
         sess.run(self.train_op, feed_dict=feed_dict)
+        # sess.run(self.train_op, feed_dict=feed_dict)
         # sess.run(self.train_op, feed_dict=feed_dict)
         # print(ac)
 
