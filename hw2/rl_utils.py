@@ -38,6 +38,7 @@ class PolicyGradient:
                  logdir=None,
                  max_path_length=None,
                  reward_to_go=True,
+                 normalize_advantages=True,
                  nn_baseline=False,
                  seed=0,
                  n_layers=1,
@@ -47,6 +48,7 @@ class PolicyGradient:
         Setup :v
         """
 
+        print(env_name)
         self.n_iter = n_iter
         self.gamma = gamma
         self.reward_to_go = reward_to_go
@@ -68,7 +70,10 @@ class PolicyGradient:
         
         # Make the gym environment
         self.env_name = env_name
+        print('still no errors')
+        print(self.seed)
         self.env = gym.make(env_name)
+        print('O:')
         # Is this env continuous, or discrete?
         discrete = isinstance(self.env.action_space, gym.spaces.Discrete)
         # Maximum length for episodes
@@ -115,7 +120,7 @@ class PolicyGradient:
             
             b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labesl=r_n, predictions=baseline_prediction))
         else:
-            advantage = self.sy_re_n
+            if normalize_advantages: advantage = tf.nn.l2_normalize(self.sy_re_n)
             b_loss = 0
 
         pg_loss = tf.reduce_mean(advantage * self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
@@ -150,7 +155,7 @@ class PolicyGradient:
         # sess.run(self.train_op, feed_dict=feed_dict)
         # print(ac)
 
-    def train(self, print_console=False, steps_eg=100, min_steps_per_batch=1000):
+    def train(self, print_console=False, steps_eg=100, batch_size=1000):
         tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)
         start = time.time()
         
@@ -161,7 +166,7 @@ class PolicyGradient:
             for itr in range(self.n_iter):
                 print("********** Iteration %i ************"%itr)
 
-                ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, min_steps_per_batch, self.max_path_length, self.reward_to_go, self.gamma)
+                ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, batch_size, self.max_path_length, self.reward_to_go, self.gamma)
                 bundle = (ob_no, ac_na, re_n)
                 total_timesteps += timesteps
                 self.update_policy(sess, bundle)
@@ -249,13 +254,60 @@ def discounted(re, discount):
 
     return signal.lfilter(b, a, x=r)[::-1]
 
-def wrapper(args):
+def args_jupyter(args, seed):
+    """
+    When using jupyter, arguments are entered as a dictionary :3
+    """
+    if not(os.path.exists('data')):
+        os.makedirs('data')
+    logdir = args.get('exp_name', 'vpg') + '_' + args.get('env_name') + '_' + time.strftime("%d-%m-%Y_%H-%M-%S")
+    logdir = os.path.join('data', logdir)
+    if not(os.path.exists(logdir)):
+        os.makedirs(logdir)
+
+    return {
+        'env_name': args.get('env_name'),
+        'n_iter': args.get('n_iter', 100),
+        'gamma': args.get('gamma', 1.0),
+        'learning_rate': args.get('learning_rate', 5e-3),
+
+        'logdir': os.path.join(logdir, '%d'%seed),
+
+        'max_path_length': args.get('max_path_length', None),
+        'reward_to_go': args.get('reward_to_go', True),
+        'normalize_advantages': args.get('normalize_advantages', False),
+        'nn_baseline': args.get('nn_baseline', False),
+        'batch_size': args.get('batch_size', 1000),
+
+        'seed': seed,
+
+        'n_layers': args.get('n_layers', 1),
+        'size': args.get('size', 32)
+    }
+
+def wrapper(args, logdir):
     """
     Put everything inside a single function, for a high amount of experiments
     Just like cs294, first call the PolicyGradient constructor with args
     then train :3
     """
-    return 0
+
+    PG = PolicyGradient(
+        env_name=args.get('env_name'),
+        n_iter=args.get('n_iter'),
+        gamma=args.get('gamma'),
+        learning_rate=args.get('learning_rate'),
+        logdir=args.get('logdir'),
+        max_path_length=args.get('max_path_length'),
+        reward_to_go=args.get('reward_to_go'),
+        normalize_advantages=args.get('normalize_advantages'),
+        nn_baseline=args.get('nn_baseline'),
+        seed=args.get('seed'),
+        n_layers=args.get('n_layers'),
+        size=args.get('size')
+    )
+
+    PG.train(print_console=False, batch_size=args.get('batch_size'))
 
 def render_NOerrors(env_name, policy, steps):
     frames = []
