@@ -8,3 +8,4 @@ ipython
 jupyter
 h5py
 git+https://github.com/jakevdp/JSAnimation.git
+seaborn
