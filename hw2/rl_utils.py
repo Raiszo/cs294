@@ -31,6 +31,7 @@ def pathlength(path):
 
 class PolicyGradient:
     def __init__(self,
+                 exp_name,
                  env_name='CartPole-v0',
                  n_iter=100, 
                  gamma=1.0,
@@ -48,7 +49,7 @@ class PolicyGradient:
         Setup :v
         """
 
-        print(env_name)
+        self.exp_name = exp_name
         self.n_iter = n_iter
         self.gamma = gamma
         self.reward_to_go = reward_to_go
@@ -70,10 +71,7 @@ class PolicyGradient:
         
         # Make the gym environment
         self.env_name = env_name
-        print('still no errors')
-        print(self.seed)
         self.env = gym.make(env_name)
-        print('O:')
         # Is this env continuous, or discrete?
         discrete = isinstance(self.env.action_space, gym.spaces.Discrete)
         # Maximum length for episodes
@@ -120,7 +118,8 @@ class PolicyGradient:
             
             b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labesl=r_n, predictions=baseline_prediction))
         else:
-            if normalize_advantages: advantage = tf.nn.l2_normalize(self.sy_re_n)
+            advantage = self.sy_re_n
+            if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
             b_loss = 0
 
         pg_loss = tf.reduce_mean(advantage * self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
@@ -164,7 +163,8 @@ class PolicyGradient:
             sess.run(tf.global_variables_initializer()) #pylint: disable=E1101
             total_timesteps = 0
             for itr in range(self.n_iter):
-                print("********** Iteration %i ************"%itr)
+                if itr % 20 or itr == self.n_iter - 1:
+                    print("********** Iteration %i ************"%itr)
 
                 ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, batch_size, self.max_path_length, self.reward_to_go, self.gamma)
                 bundle = (ob_no, ac_na, re_n)
@@ -231,7 +231,7 @@ def run_rollouts(env,
         }
         paths.append(path)
 
-        steps_total += len(path)
+        steps_total += len(rewards)
         num_rollouts += 1
 
     print(num_rollouts)
@@ -266,6 +266,7 @@ def args_jupyter(args, seed):
         os.makedirs(logdir)
 
     return {
+        'exp_name': args.get('exp_name', 'vpg'),
         'env_name': args.get('env_name'),
         'n_iter': args.get('n_iter', 100),
         'gamma': args.get('gamma', 1.0),
@@ -293,6 +294,7 @@ def wrapper(args, logdir):
     """
 
     PG = PolicyGradient(
+        exp_name=args.get('exp_name'),
         env_name=args.get('env_name'),
         n_iter=args.get('n_iter'),
         gamma=args.get('gamma'),
