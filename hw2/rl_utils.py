@@ -116,7 +116,7 @@ class PolicyGradient:
 
             if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
             
-            b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labesl=r_n, predictions=baseline_prediction))
+            b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.sy_re_n, predictions=baseline_prediction))
         else:
             advantage = self.sy_re_n
             if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
@@ -163,7 +163,7 @@ class PolicyGradient:
             sess.run(tf.global_variables_initializer()) #pylint: disable=E1101
             total_timesteps = 0
             for itr in range(self.n_iter):
-                if itr % 20 or itr == self.n_iter - 1:
+                if itr % 20 == 0 or itr == self.n_iter - 1:
                     print("********** Iteration %i ************"%itr)
 
                 ob_no, ac_na, re_n, returns, ep_lengths, timesteps = run_rollouts(self.env, sess, self, batch_size, self.max_path_length, self.reward_to_go, self.gamma)
@@ -199,7 +199,7 @@ class PolicyGradient:
 def run_rollouts(env,
                  sess,
                  policy,
-                 min_steps_per_batch,
+                 batch_size,
                  max_path_length,
                  reward_to_go,
                  gamma=1):
@@ -208,7 +208,7 @@ def run_rollouts(env,
     steps_total = 0
     num_rollouts = 0
     
-    while steps_total < min_steps_per_batch:
+    while steps_total < batch_size:
         obs = env.reset()
         observations, actions, rewards = [], [], []
         # animate stuff
@@ -234,7 +234,6 @@ def run_rollouts(env,
         steps_total += len(rewards)
         num_rollouts += 1
 
-    print(num_rollouts)
     ob_no = np.concatenate([path["observation"] for path in paths])
     ac_na = np.concatenate([path["action"] for path in paths])
     if reward_to_go == False:
