@@ -1,8 +1,9 @@
+import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-import matplotlib.pyplot as plt
 import json
 import os
+from os import path as path
 
 """
 Using the plotter:
@@ -48,12 +49,15 @@ the --legend flag and then provide a title for each logdir.
 
 """
 
-def plot_data(data, value="AverageReturn"):
+def plot_data(data, plot_name, value="AverageReturn"):
     if isinstance(data, list):
         data = pd.concat(data, ignore_index=True)
+
+    # plt.ioff()
     sns.set(style="darkgrid", font_scale=1.5)
     sns.tsplot(data=data, time="Iteration", value=value, unit="Unit", condition="Condition")
     plt.legend(loc='best').draggable()
+    plt.savefig(plot_name, dpi='figure', bbox_inches='tight')
     plt.show()
 
 
@@ -99,7 +103,7 @@ def main():
         assert len(args.legend) == len(args.logdir), \
             "Must give a legend title for each set of experiments."
         use_legend = True
-
+        
     data = []
     if use_legend:
         for logdir, legend_title in zip(args.logdir, args.legend):
@@ -113,7 +117,7 @@ def main():
     else:
         values = [args.value]
     for value in values:
-        plot_data(data, value=value)
+        plot_data(data, path.join(logdir, 'plot4this.png'), value=value)
 
 if __name__ == "__main__":
     main()
