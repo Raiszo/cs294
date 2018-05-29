@@ -115,8 +115,11 @@ class PolicyGradient:
             advantage = self.sy_re_n - baseline_prediction
 
             if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
-            
-            b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.sy_re_n, predictions=baseline_prediction))
+
+            [batch_mean, batch_var] = tf.nn.moments(self.sy_re_n, axes=[0])
+            [pred_mean, pred_var] = tf.nn.moments(baseline_prediction, axes=[0])
+            rescaled_prediction = (baseline_prediction - pred_mean) / pred_var * batch_var + batch_mean
+            b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.sy_re_n, predictions=rescaled_prediction))
         else:
             advantage = self.sy_re_n
             if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
