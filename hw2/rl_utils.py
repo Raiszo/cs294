@@ -114,15 +114,22 @@ class PolicyGradient:
             # _update_op = tf.train.AdamOptimizer(learning_rate).minimize(b_loss)
             advantage = self.sy_re_n - baseline_prediction
 
-            if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
+            if normalize_advantages:
+                [mean, var] = tf.nn.moments(advantage, axes=[0])
+                advantage = (advantage - mean) / (tf.sqrt(var) + 1e-8)
 
+            eps = 1e-8
             [batch_mean, batch_var] = tf.nn.moments(self.sy_re_n, axes=[0])
             [pred_mean, pred_var] = tf.nn.moments(baseline_prediction, axes=[0])
-            rescaled_prediction = (baseline_prediction - pred_mean) / pred_var * batch_var + batch_mean
-            b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.sy_re_n, predictions=rescaled_prediction))
+            rescaled_prediction = (baseline_prediction - pred_mean) / (tf.sqrt(pred_var) + eps) * tf.sqrt(batch_var) + batch_mean
+            # rescaled_prediction = baseline_prediction
+            b_loss = tf.reduce_mean(tf.square(self.sy_re_n - rescaled_prediction))
         else:
             advantage = self.sy_re_n
-            if normalize_advantages: advantage = tf.nn.l2_normalize(advantage)
+            if normalize_advantages:
+                [mean, var] = tf.nn.moments(advantage, axes=[0])
+                advantage = (advantage - mean) / (tf.sqrt(var) + 1e-8)
+                
             b_loss = 0
 
         pg_loss = tf.reduce_mean(advantage * self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.

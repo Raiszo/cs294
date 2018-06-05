@@ -1,0 +1,13 @@
+{"env_name"	:	"CartPole-v0",
+"exp_name"	:	"vanilla",
+"gamma"	:	1.0,
+"learning_rate"	:	0.005,
+"logdir"	:	"data/vanilla_CartPole-v0_31-05-2018_01-46-25/0",
+"max_path_length"	:	null,
+"n_iter"	:	100,
+"n_layers"	:	1,
+"nn_baseline"	:	false,
+"normalize_advantages"	:	true,
+"reward_to_go"	:	true,
+"seed"	:	0,
+"size"	:	32}
