@@ -74,8 +74,9 @@ class PolicyGradient:
         self.env = gym.make(env_name)
         # Is this env continuous, or discrete?
         discrete = isinstance(self.env.action_space, gym.spaces.Discrete)
+        self.discrete = discrete
         # Maximum length for episodes
-        self.max_path_length = max_path_length or self.env.spec.max_episode_steps
+        self.max_path_length = max_path_length or self.env.spec.max_episode_steps 
         
 
         # Observation and action sizes
@@ -100,6 +101,17 @@ class PolicyGradient:
             # This is the sampled action from the policy
             self.sy_sampled_ac = tf.multinomial(sy_logits_na - tf.reduce_max(sy_logits_na, axis=1, keepdims=True), 1)
             self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.sy_ac_na, logits=sy_logits_na)
+        else:
+            sy_mean = build_mlp(self.sy_ob_no, ac_dim, 'policy',
+                                n_layers=n_layers, size=size)
+            sy_logstd = tf.Variable(tf.zeros([1, ac_dim]), name='logstd',
+                                    dtype=tf.float32)
+            sy_std = tf.exp(sy_logstd)
+            self.sy_sampled_ac = sy_mean + sy_std \
+                                 * tf.random_normal(tf.shape(sy_mean))
+            sy_z = (self.sy_ac_na - sy_mean) / sy_std
+            self.sy_logprob_n = -0.5* tf.reduce_sum(tf.square(sy_z), axis=1)
+            
         # TODO the non discrete case :P
         
 
@@ -149,7 +161,12 @@ class PolicyGradient:
 
     def act(self, sess, obs, learning_rate=5e-3):
         action = sess.run(self.sy_sampled_ac, feed_dict={self.sy_ob_no: obs[None]})
-        return action[0][0]
+        if self.discrete:
+            # return a single number
+            return action[0][0]
+        else:
+            # return a vector
+            return action[0]
     
     def update_policy(self, sess, bundle):
         ob_no, ac_na, re_n = bundle
