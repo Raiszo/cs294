@@ -90,7 +90,9 @@ class PolicyGradient:
         self.sy_ac_na = tf.placeholder(shape=[None], name="actions", dtype=tf.int32) \
                         if discrete else \
                            tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32)
-        self.sy_re_n = tf.placeholder(shape=[None], name='rewards', dtype=tf.float32)
+        # Define a placeholder for Value of a state
+        self.sy_q_n = tf.placeholder(shape=[None], name='rewards', dtype=tf.float32)
+        # self.sy_target_n = tf.placeholder(shape=[None], name='baseline prediction', dtype=tf.float32)
 
         if discrete:
             sy_logits_na = build_mlp(self.sy_ob_no, ac_dim, 'policy', n_layers=n_layers, size=size)
@@ -98,41 +100,38 @@ class PolicyGradient:
             # This is the sampled action from the policy
             self.sy_sampled_ac = tf.multinomial(sy_logits_na - tf.reduce_max(sy_logits_na, axis=1, keepdims=True), 1)
             self.sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.sy_ac_na, logits=sy_logits_na)
-            
-            
         # TODO the non discrete case :P
+        
 
+        eps = 1e-8
         if nn_baseline:
+            # baseline_prediction should always compute normalized values
             baseline_prediction = tf.squeeze(build_mlp(
                 self.sy_ob_no, 
                 1, 
                 "nn_baseline",
                 n_layers=n_layers,
                 size=size))
-            # self.sy_b_n = tf.placeholder(shape=[None], name='b', dtype=tf.float32)
-            # b_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.sy_b_n, predictions=baseline_prediction))
-            # _update_op = tf.train.AdamOptimizer(learning_rate).minimize(b_loss)
-            advantage = self.sy_re_n - baseline_prediction
+            # Normalize the placeholder that is feed for this operation
+            [mean_qn, var_qn] = tf.nn.moments(self.sy_q_n, axes=[0])
+            std_qn = tf.sqrt(var_qn)
+            
+            baseline_target = (self.sy_q_n - mean_qn) / (std_qn + eps)
+            b_loss = tf.reduce_mean(tf.square(baseline_target - baseline_prediction))
 
-            if normalize_advantages:
-                [mean, var] = tf.nn.moments(advantage, axes=[0])
-                advantage = (advantage - mean) / (tf.sqrt(var) + 1e-8)
-
-            eps = 1e-8
-            [batch_mean, batch_var] = tf.nn.moments(self.sy_re_n, axes=[0])
-            [pred_mean, pred_var] = tf.nn.moments(baseline_prediction, axes=[0])
-            rescaled_prediction = (baseline_prediction - pred_mean) / (tf.sqrt(pred_var) + eps) * tf.sqrt(batch_var) + batch_mean
-            # rescaled_prediction = baseline_prediction
-            b_loss = tf.reduce_mean(tf.square(self.sy_re_n - rescaled_prediction))
+            # Rescale the prediction to match the current q_n mean and variance
+            baseline_rescaled = baseline_prediction * std_qn + mean_qn
+            adv_n = self.sy_q_n - baseline_rescaled
         else:
-            advantage = self.sy_re_n
-            if normalize_advantages:
-                [mean, var] = tf.nn.moments(advantage, axes=[0])
-                advantage = (advantage - mean) / (tf.sqrt(var) + 1e-8)
-                
             b_loss = 0
+            adv_n = self.sy_q_n
 
-        pg_loss = tf.reduce_mean(advantage * self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
+        if normalize_advantages:
+            [mean_adv, var_adv] = tf.nn.moments(adv_n, axes=[0])
+            std_adv = tf.sqrt(var_adv)
+            adv_n = (adv_n - mean_adv) / (std_adv + 1e-8)
+
+        pg_loss = tf.reduce_mean(adv_n * self.sy_logprob_n) # Loss function that we'll differentiate to get the policy gradient.
         # self.update_op = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
 
 
@@ -157,7 +156,7 @@ class PolicyGradient:
         feed_dict = {
             self.sy_ob_no: ob_no,
             self.sy_ac_na: ac_na,
-            self.sy_re_n: re_n
+            self.sy_q_n: re_n
         }
         sess.run(self.train_op, feed_dict=feed_dict)
         # sess.run(self.train_op, feed_dict=feed_dict)
