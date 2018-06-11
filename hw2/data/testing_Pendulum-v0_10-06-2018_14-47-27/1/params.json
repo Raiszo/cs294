@@ -1,0 +1,13 @@
+{"env_name"	:	"Pendulum-v0",
+"exp_name"	:	"simple_test",
+"gamma"	:	1.0,
+"learning_rate"	:	0.005,
+"logdir"	:	"data/testing_Pendulum-v0_10-06-2018_14-47-27/1",
+"max_path_length"	:	null,
+"n_iter"	:	500,
+"n_layers"	:	1,
+"nn_baseline"	:	false,
+"normalize_advantages"	:	true,
+"reward_to_go"	:	true,
+"seed"	:	1,
+"size"	:	32}
